@@ -30,7 +30,7 @@ import * as ethers from 'ethers'
 
 const NUM_LEVELS = 20
 const FIRST_EXTERNAL_NULLIFIER = 0
-const SIGNAL = 'signal0'
+const SIGNAL = 'yes'
 
 const genTestAccounts = (num: number, mnemonic: string) => {
     let accounts: ethers.Wallet[] = []
@@ -188,6 +188,7 @@ describe('Semaphore', () => {
             expect.assertions(4)
             const tx = await semaphoreClientContract.addExternalNullifier(
                 activeEn,
+                'Should we serve Pizza?',
                 { gasLimit: 200000 },
             )
             const receipt = await tx.wait()
@@ -214,6 +215,7 @@ describe('Semaphore', () => {
         test('should be able to deactivate an external nullifier', async () => {
             await (await semaphoreClientContract.addExternalNullifier(
                 inactiveEn,
+                'inactive',
                 { gasLimit: 200000 },
             )).wait()
             const tx = await semaphoreClientContract.deactivateExternalNullifier(
@@ -267,6 +269,7 @@ describe('Semaphore', () => {
             expect(BigInt(externalNullifiers[1].toString())).toEqual(BigInt(activeEn.toString()))
             expect(BigInt(externalNullifiers[2].toString())).toEqual(BigInt(inactiveEn.toString()))
         })
+        
     })
 
     describe('signal broadcasts', () => {
@@ -467,10 +470,38 @@ describe('Semaphore', () => {
             }
         })
 
-        test('signalling to a different external nullifier should work', async () => {
-            expect.assertions(1)
+        // test('signalling to a different external nullifier should work', async () => {
+        //     expect.assertions(1)
+        //     const leaves = await semaphoreClientContract.getIdentityCommitments()
+        //     const newSignal = 'newSignal1'
+
+        //     const result = await genWitness(
+        //         newSignal,
+        //         circuit,
+        //         identity,
+        //         leaves,
+        //         NUM_LEVELS,
+        //         activeEn,
+        //     )
+
+        //     proof = await genProof(result.witness, provingKey)
+        //     publicSignals = genPublicSignals(result.witness, circuit)
+        //     params = genBroadcastSignalParams(result, proof, publicSignals)
+        //     const tx = await semaphoreClientContract.broadcastSignal(
+        //         ethers.utils.toUtf8Bytes(newSignal),
+        //         params.proof,
+        //         params.root,
+        //         params.nullifiersHash,
+        //         activeEn,
+        //         { gasLimit: 1000000 },
+        //     )
+        //     const receipt = await tx.wait()
+        //     expect(receipt.status).toEqual(1)
+        // })
+        test('vote yes', async () => {
+            expect.assertions(3)
             const leaves = await semaphoreClientContract.getIdentityCommitments()
-            const newSignal = 'newSignal1'
+            const newSignal = 'yes'
 
             const result = await genWitness(
                 newSignal,
@@ -484,6 +515,7 @@ describe('Semaphore', () => {
             proof = await genProof(result.witness, provingKey)
             publicSignals = genPublicSignals(result.witness, circuit)
             params = genBroadcastSignalParams(result, proof, publicSignals)
+            const signalIndex = await semaphoreClientContract.nextSignalIndex();
             const tx = await semaphoreClientContract.broadcastSignal(
                 ethers.utils.toUtf8Bytes(newSignal),
                 params.proof,
@@ -493,7 +525,13 @@ describe('Semaphore', () => {
                 { gasLimit: 1000000 },
             )
             const receipt = await tx.wait()
+            
             expect(receipt.status).toEqual(1)
+            const issue = await semaphoreContract.externalNullifierLinkedList(activeEn)
+            expect(issue[1]).toEqual("Should we serve Pizza?")
+            const signals = await semaphoreClientContract.getVoteCounts(activeEn)
+            console.log(signals)
+            expect(signals[0]).toEqual(true)
         })
 
         test('broadcastSignal to a deactivated external nullifier should fail', async () => {

@@ -21,16 +21,18 @@
 
 pragma solidity ^0.5.0;
 
-import { Semaphore } from './Semaphore.sol';
+import {Semaphore} from "./Semaphore.sol";
 
 contract SemaphoreClient {
     uint256[] public identityCommitments;
 
     // A mapping of all signals broadcasted
-    mapping (uint256 => bytes) public signalIndexToSignal;
+    mapping(uint256 => bytes) public signalIndexToSignal;
 
     // A mapping between signal indices to external nullifiers
-    mapping (uint256 => uint256) public signalIndexToExternalNullifier;
+    mapping(uint256 => uint256) public signalIndexToExternalNullifier;
+    // stores the relevant signals for a particular issue
+    mapping(uint256 => bool[]) public nullifierIndexToSignalVotes;
 
     // The next index of the `signalIndexToSignal` mapping
     uint256 public nextSignalIndex = 0;
@@ -43,11 +45,23 @@ contract SemaphoreClient {
         semaphore = _semaphore;
     }
 
-    function getIdentityCommitments() public view returns (uint256 [] memory) {
+    function getVoteCounts(uint256 issueIndex)
+        public
+        view
+        returns (bool[] memory)
+    {
+        return nullifierIndexToSignalVotes[issueIndex];
+    }
+
+    function getIdentityCommitments() public view returns (uint256[] memory) {
         return identityCommitments;
     }
 
-    function getIdentityCommitment(uint256 _index) public view returns (uint256) {
+    function getIdentityCommitment(uint256 _index)
+        public
+        view
+        returns (uint256)
+    {
         return identityCommitments[_index];
     }
 
@@ -56,8 +70,11 @@ contract SemaphoreClient {
         identityCommitments.push(_leaf);
     }
 
-    function addExternalNullifier(uint232 _externalNullifier) public {
-        semaphore.addExternalNullifier(_externalNullifier);
+    function addExternalNullifier(
+        uint232 _externalNullifier,
+        string memory issue
+    ) public {
+        semaphore.addExternalNullifier(_externalNullifier, issue);
     }
 
     function deactivateExternalNullifier(uint232 _externalNullifier) public {
@@ -66,6 +83,15 @@ contract SemaphoreClient {
 
     function reactivateExternalNullifier(uint232 _externalNullifier) public {
         semaphore.reactivateExternalNullifier(_externalNullifier);
+    }
+
+    function compareStrings(string memory a, string memory b)
+        public
+        pure
+        returns (bool)
+    {
+        return (keccak256(abi.encodePacked((a))) ==
+            keccak256(abi.encodePacked((b))));
     }
 
     function broadcastSignal(
@@ -84,11 +110,20 @@ contract SemaphoreClient {
         signalIndexToExternalNullifier[nextSignalIndex] = _externalNullifier;
 
         // increment the signal index
-        nextSignalIndex ++;
+        nextSignalIndex++;
 
         // broadcast the signal
-        semaphore.broadcastSignal(_signal, _proof, _root, _nullifiersHash, _externalNullifier);
-
+        semaphore.broadcastSignal(
+            _signal,
+            _proof,
+            _root,
+            _nullifiersHash,
+            _externalNullifier
+        );
+        // push vote to issue
+        string memory converted = string(_signal);
+        bool vote = compareStrings(converted, "yes") ? true : false;
+        nullifierIndexToSignalVotes[_externalNullifier].push(vote);
         emit SignalBroadcastByClient(signalIndex);
     }
 
@@ -96,7 +131,11 @@ contract SemaphoreClient {
      * Returns the external nullifier which a signal at _index broadcasted to
      * @param _index The index to use to look up the signalIndexToExternalNullifier mapping
      */
-    function getExternalNullifierBySignalIndex(uint256 _index) public view returns (uint256) {
+    function getExternalNullifierBySignalIndex(uint256 _index)
+        public
+        view
+        returns (uint256)
+    {
         return signalIndexToExternalNullifier[_index];
     }
 

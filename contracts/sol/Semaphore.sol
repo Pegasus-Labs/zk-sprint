@@ -22,7 +22,7 @@
 pragma solidity ^0.5.0;
 
 import "./verifier.sol";
-import { IncrementalMerkleTree } from "./IncrementalMerkleTree.sol";
+import {IncrementalMerkleTree} from "./IncrementalMerkleTree.sol";
 import "./Ownable.sol";
 
 contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
@@ -32,6 +32,7 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
     // Each node in the linked list
     struct ExternalNullifierNode {
         uint232 next;
+        string issue;
         bool exists;
         bool isActive;
     }
@@ -39,11 +40,11 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
     // We store the external nullifiers using a mapping of the form:
     // enA => { next external nullifier; if enA exists; if enA is active }
     // Think of it as a linked list.
-    mapping (uint232 => ExternalNullifierNode) public
-        externalNullifierLinkedList;
+    mapping(uint232 => ExternalNullifierNode)
+        public externalNullifierLinkedList;
 
     uint256 public numExternalNullifiers = 0;
-    
+
     // First and last external nullifiers for linked list enumeration
     uint232 public firstExternalNullifier = 0;
     uint232 public lastExternalNullifier = 0;
@@ -53,7 +54,7 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
     bool public isBroadcastPermissioned = true;
 
     // Whether the contract has already seen a particular nullifier hash
-    mapping (uint256 => bool) public nullifierHashHistory;
+    mapping(uint256 => bool) public nullifierHashHistory;
 
     event PermissionSet(bool indexed newPermission);
     event ExternalNullifierAdd(uint232 indexed externalNullifier);
@@ -70,8 +71,8 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
     // nothing-up-my-sleeve value, the authors hope to demonstrate that they do
     // not have its preimage and therefore cannot spend funds they do not own.
 
-    uint256 public NOTHING_UP_MY_SLEEVE_ZERO = 
-        uint256(keccak256(abi.encodePacked('Semaphore'))) % SNARK_SCALAR_FIELD;
+    uint256 public NOTHING_UP_MY_SLEEVE_ZERO =
+        uint256(keccak256(abi.encodePacked("Semaphore"))) % SNARK_SCALAR_FIELD;
 
     /*
      * If broadcastSignal is permissioned, check if msg.sender is the contract
@@ -91,22 +92,26 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
      * @param _firstExternalNullifier The first identity nullifier to add.
      */
     constructor(uint8 _treeLevels, uint232 _firstExternalNullifier)
+        public
         IncrementalMerkleTree(_treeLevels, NOTHING_UP_MY_SLEEVE_ZERO)
         Ownable()
-        public {
-            addEn(_firstExternalNullifier, true);
+    {
+        addEn(_firstExternalNullifier, true, "first");
     }
 
     /*
-     * Registers a new user. 
+     * Registers a new user.
      * @param _identity_commitment The user's identity commitment, which is the
      *                            hash of their public key and their identity
      *                            nullifier (a random 31-byte value). It should
      *                            be the output of a Pedersen hash. It is the
      *                            responsibility of the caller to verify this.
      */
-    function insertIdentity(uint256 _identityCommitment) public onlyOwner
-    returns (uint256) {
+    function insertIdentity(uint256 _identityCommitment)
+        public
+        onlyOwner
+        returns (uint256)
+    {
         // Ensure that the given identity commitment is not the zero value
         require(
             _identityCommitment != NOTHING_UP_MY_SLEEVE_ZERO,
@@ -126,10 +131,12 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
      * @param _c The corresponding `c` parameter to verifier.sol's
                  verifyProof()
      */
-    function areAllValidFieldElements(
-        uint256[8] memory _proof
-    ) internal pure returns (bool) {
-        return 
+    function areAllValidFieldElements(uint256[8] memory _proof)
+        internal
+        pure
+        returns (bool)
+    {
+        return
             _proof[0] < SNARK_SCALAR_FIELD &&
             _proof[1] < SNARK_SCALAR_FIELD &&
             _proof[2] < SNARK_SCALAR_FIELD &&
@@ -158,15 +165,14 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
      * @param _c The corresponding `c` parameter to verifier.sol's
      *           verifyProof()
      */
-    function packProof (
+    function packProof(
         uint256[2] memory _a,
         uint256[2][2] memory _b,
         uint256[2] memory _c
     ) public pure returns (uint256[8] memory) {
-
         return [
             _a[0],
-            _a[1], 
+            _a[1],
             _b[0][0],
             _b[0][1],
             _b[1][0],
@@ -182,24 +188,21 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
      * accepts.
      * @param _proof The proof elements.
      */
-    function unpackProof(
-        uint256[8] memory _proof
-    ) public pure returns (
-        uint256[2] memory,
-        uint256[2][2] memory,
-        uint256[2] memory
-    ) {
-
+    function unpackProof(uint256[8] memory _proof)
+        public
+        pure
+        returns (
+            uint256[2] memory,
+            uint256[2][2] memory,
+            uint256[2] memory
+        )
+    {
         return (
             [_proof[0], _proof[1]],
-            [
-                [_proof[2], _proof[3]],
-                [_proof[4], _proof[5]]
-            ],
+            [[_proof[2], _proof[3]], [_proof[4], _proof[5]]],
             [_proof[6], _proof[7]]
         );
     }
-
 
     /*
      * A convenience view function which helps operators to easily verify all
@@ -217,7 +220,7 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
      *                    matches.
      * @param _externalNullifier The external nullifier
      */
-    function preBroadcastCheck (
+    function preBroadcastCheck(
         bytes memory _signal,
         uint256[8] memory _proof,
         uint256 _root,
@@ -225,14 +228,21 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
         uint256 _signalHash,
         uint232 _externalNullifier
     ) public view returns (bool) {
+        uint256[4] memory publicSignals = [
+            _root,
+            _nullifiersHash,
+            _signalHash,
+            _externalNullifier
+        ];
 
-        uint256[4] memory publicSignals =
-            [_root, _nullifiersHash, _signalHash, _externalNullifier];
+        (
+            uint256[2] memory a,
+            uint256[2][2] memory b,
+            uint256[2] memory c
+        ) = unpackProof(_proof);
 
-        (uint256[2] memory a, uint256[2][2] memory b, uint256[2] memory c) = 
-            unpackProof(_proof);
-
-        return nullifierHashHistory[_nullifiersHash] == false &&
+        return
+            nullifierHashHistory[_nullifiersHash] == false &&
             hashSignal(_signal) == _signalHash &&
             _signalHash == hashSignal(_signal) &&
             isExternalNullifierActive(_externalNullifier) &&
@@ -252,7 +262,7 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
      * @param _signalHash The signal hash
      * @param _externalNullifier The external nullifier
      */
-    modifier isValidSignalAndProof (
+    modifier isValidSignalAndProof(
         bytes memory _signal,
         uint256[8] memory _proof,
         uint256 _root,
@@ -290,11 +300,18 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
             "Semaphore: the nullifiers hash must be lt the snark scalar field"
         );
 
-        uint256[4] memory publicSignals =
-            [_root, _nullifiersHash, signalHash, _externalNullifier];
+        uint256[4] memory publicSignals = [
+            _root,
+            _nullifiersHash,
+            signalHash,
+            _externalNullifier
+        ];
 
-        (uint256[2] memory a, uint256[2][2] memory b, uint256[2] memory c) =
-            unpackProof(_proof);
+        (
+            uint256[2] memory a,
+            uint256[2][2] memory b,
+            uint256[2] memory c
+        ) = unpackProof(_proof);
 
         require(
             verifyProof(a, b, c, publicSignals),
@@ -322,14 +339,19 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
         uint256 _root,
         uint256 _nullifiersHash,
         uint232 _externalNullifier
-    ) public 
+    )
+        public
         onlyOwnerIfPermissioned
         isValidSignalAndProof(
-            _signal, _proof, _root, _nullifiersHash, _externalNullifier
+            _signal,
+            _proof,
+            _root,
+            _nullifiersHash,
+            _externalNullifier
         )
     {
         // Client contracts should be responsible for storing the signal and/or
-        // emitting it as an event 
+        // emitting it as an event
 
         // Store the nullifiers hash to prevent double-signalling
         nullifierHashHistory[_nullifiersHash] = true;
@@ -342,7 +364,11 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
      * nullifier. Only the constructor should set _isFirst to true when it
      * calls addEn().
      */
-    function addEn(uint232 _externalNullifier, bool isFirst) private {
+    function addEn(
+        uint232 _externalNullifier,
+        bool isFirst,
+        string memory issue
+    ) private {
         if (isFirst) {
             firstExternalNullifier = _externalNullifier;
         } else {
@@ -353,19 +379,20 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
             );
 
             // Connect the previously added external nullifier node to this one
-            externalNullifierLinkedList[lastExternalNullifier].next =
-                _externalNullifier;
+            externalNullifierLinkedList[lastExternalNullifier]
+                .next = _externalNullifier;
         }
 
         // Add a new external nullifier
         externalNullifierLinkedList[_externalNullifier].next = 0;
         externalNullifierLinkedList[_externalNullifier].isActive = true;
         externalNullifierLinkedList[_externalNullifier].exists = true;
+        externalNullifierLinkedList[_externalNullifier].issue = issue;
 
         // Set the last external nullifier to this one
         lastExternalNullifier = _externalNullifier;
 
-        numExternalNullifiers ++;
+        numExternalNullifiers++;
 
         emit ExternalNullifierAdd(_externalNullifier);
     }
@@ -375,9 +402,11 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
      * active once it is added. Only the owner can do this.
      * @param _externalNullifier The new external nullifier to set.
      */
-    function addExternalNullifier(uint232 _externalNullifier) public
-    onlyOwner {
-        addEn(_externalNullifier, false);
+    function addExternalNullifier(
+        uint232 _externalNullifier,
+        string memory issue
+    ) public onlyOwner {
+        addEn(_externalNullifier, false, issue);
     }
 
     /*
@@ -385,8 +414,10 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
      * active for this function to work. Only the owner can do this.
      * @param _externalNullifier The new external nullifier to deactivate.
      */
-    function deactivateExternalNullifier(uint232 _externalNullifier) public
-    onlyOwner {
+    function deactivateExternalNullifier(uint232 _externalNullifier)
+        public
+        onlyOwner
+    {
         // The external nullifier must already exist
         require(
             externalNullifierLinkedList[_externalNullifier].exists,
@@ -411,8 +442,10 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
      * inactive for this function to work. Only the owner can do this.
      * @param _externalNullifier The new external nullifier to reactivate.
      */
-    function reactivateExternalNullifier(uint232 _externalNullifier) public
-    onlyOwner {
+    function reactivateExternalNullifier(uint232 _externalNullifier)
+        public
+        onlyOwner
+    {
         // The external nullifier must already exist
         require(
             externalNullifierLinkedList[_externalNullifier].exists,
@@ -435,8 +468,11 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
      * Returns true if and only if the specified external nullifier is active
      * @param _externalNullifier The specified external nullifier.
      */
-    function isExternalNullifierActive(uint232 _externalNullifier) public view
-    returns (bool) {
+    function isExternalNullifierActive(uint232 _externalNullifier)
+        public
+        view
+        returns (bool)
+    {
         return externalNullifierLinkedList[_externalNullifier].isActive;
     }
 
@@ -445,9 +481,11 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
      * nullifier in the linked list.
      * @param _externalNullifier The specified external nullifier.
      */
-    function getNextExternalNullifier(uint232 _externalNullifier) public view
-    returns (uint232) {
-
+    function getNextExternalNullifier(uint232 _externalNullifier)
+        public
+        view
+        returns (uint232)
+    {
         require(
             externalNullifierLinkedList[_externalNullifier].exists,
             "Semaphore: no such external nullifier"
@@ -459,7 +497,7 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
             numExternalNullifiers > 1 && externalNullifierLinkedList[n].exists,
             "Semaphore: no external nullifier exists after the specified one"
         );
-        
+
         return n;
     }
 
@@ -478,9 +516,8 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
      *                       the contract owner; and False otherwise.
      */
     function setPermissioning(bool _newPermission) public onlyOwner {
+        isBroadcastPermissioned = _newPermission;
 
-      isBroadcastPermissioned = _newPermission;
-
-      emit PermissionSet(_newPermission);
+        emit PermissionSet(_newPermission);
     }
 }

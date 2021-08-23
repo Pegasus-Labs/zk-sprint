@@ -1,12 +1,31 @@
-# Semaphore
+# ZK snark semaphore
 
-Semaphore is a zero-knowledge gadget which allows users to prove their
-membership of a set without revealing their original identity. At the same
-time, it allows users to signal their endorsement of an arbitrary string. It is
-designed to be a simple and generic privacy layer for Ethereum dApps. Use cases
-include private voting, whistleblowing, mixers, and anonymous authentication.
+# Setup
 
-For more information, refer to the
-[documentation](https://appliedzkp.github.io/semaphore/).
+```
+npm i && \
+npm run bootstrap && \
+npm run build
+```
 
-Join the [Telegram group](https://t.me/joinchat/B-PQx1U3GtAh--Z4Fwo56A) to discuss.
+Download the circuits: (Note: u may need to install wget)
+`./circuits/scripts/download_snarks.sh`
+
+Then you need to use Node 11.14.0 for this or it wont work. Do not npm i in this folder
+
+```
+cd contracts && \
+npm run compileSol
+```
+
+# Then to test
+
+`npm run ganache`
+then in another terminal tab enter cli-interface
+
+```
+cd ..
+cd cli-interface
+npm i
+node index.js
+```

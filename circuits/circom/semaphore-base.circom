@@ -81,7 +81,7 @@ template CalculateIdentityCommitment(IDENTITY_PK_SIZE_IN_BITS, NULLIFIER_TRAPDOO
   signal output out;
 
   // identity commitment is a pedersen hash of (identity_pk, identity_nullifier, identity_trapdoor), each element padded up to 256 bits
-  component identity_commitment = Pedersen(3*256);
+  component identity_commitment = Pedersen(3*256); // adding each element in the hash into the circuit
   for (var i = 0; i < 256; i++) {
     if (i < IDENTITY_PK_SIZE_IN_BITS) {
       identity_commitment.in[i] <== identity_pk[i];
@@ -98,7 +98,7 @@ template CalculateIdentityCommitment(IDENTITY_PK_SIZE_IN_BITS, NULLIFIER_TRAPDOO
     }
   }
 
-  out <== identity_commitment.out[0];
+  out <== identity_commitment.out[0]; // output of the hash
 }
 
 template CalculateNullifier(NULLIFIER_TRAPDOOR_SIZE_IN_BITS, EXTERNAL_NULLIFIER_SIZE_IN_BITS, n_levels) {
@@ -130,7 +130,7 @@ template CalculateNullifier(NULLIFIER_TRAPDOOR_SIZE_IN_BITS, EXTERNAL_NULLIFIER_
     nullifiers_hasher.in_bits[NULLIFIER_TRAPDOOR_SIZE_IN_BITS + EXTERNAL_NULLIFIER_SIZE_IN_BITS + i] <== identity_path_index[i];
   }
 
-  for (var i = (NULLIFIER_TRAPDOOR_SIZE_IN_BITS + EXTERNAL_NULLIFIER_SIZE_IN_BITS + n_levels); i < nullifiers_hasher_bits; i++) {
+  for (var i = (NULLIFIER_TRAPDOOR_SIZE_IN_BITS + EXTERNAL_NULLIFIER_SIZE_IN_BITS + n_levels); i < nullifiers_hasher_bits; i++) { // pad to 512 if leftover
     nullifiers_hasher.in_bits[i] <== 0;
   }
 
