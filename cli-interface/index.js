@@ -162,7 +162,12 @@ const endVote = async (topic) => {
   const results = await semaphoreClientContract.getVoteCounts(
     external_nullifier,
   )
-  console.log('Results: ' + results)
+  const yesVotes = results.filter((obj) => obj).length
+  const noVotes = results.length - yesVotes
+  const resultString = yesVotes < noVotes ? 'does not pass.' : 'passes!'
+  console.info('Yes Votes: ' + yesVotes)
+  console.info('No Votes: ' + noVotes)
+  console.info('The proposal ' + resultString)
   const tx = await semaphoreClientContract.deactivateExternalNullifier(
     external_nullifier,
     { gasLimit: 100000 },
@@ -199,13 +204,11 @@ const sendVote = async (vote, topic) => {
       { gasLimit: 1000000 },
     )
     const receipt = await tx.wait()
+    console.log('Vote Recorded')
   } catch (e) {
-    console.log(
-      'Vote Failed: You already voted for this proposal',
-    )
+    console.error('Vote Failed: You already voted for this proposal')
   }
   status.stop()
-  console.log('Vote Recorded')
 }
 
 const run = async () => {
@@ -244,7 +247,6 @@ const run = async () => {
         await endVote(selected_topic)
       }
     } else {
-      clear()
       break
     }
     credentials = await inquirer.welcome()
